@@ -1,0 +1,314 @@
+/*
+ ============================================================================
+ Name        : L3GD20H.c
+ Author      : cgonzalezbrito
+ Version     :
+ Copyright   :
+ Description :
+ ============================================================================
+ */
+
+# include <stdio.h>
+# include <stdlib.h>
+
+#include <linux/i2c-dev.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+ int file = 0;
+
+void address(int address){
+	char buf[1];
+	buf[0]=address;
+	if (write(file,buf,1) != 1){
+		/* ERROR HANDLING: i2c transaction failed */
+		printf("ERROR WRITE PROCCESS");
+		exit(1);
+	}
+}
+
+int xcalibrate(){
+
+	char buf[1];
+	int status = 0;
+	int ix=0; int xsum=0; int xhigh=0; int xlow=0;
+
+	printf("Setting thresholds.\nWait .\n");
+
+	while (ix<=60){
+
+		usleep(1000);
+
+		address(0x27);
+		read(file,buf,1);
+		status = buf[0];
+
+		if((status&0x80)==0x80){			//New Data
+			if ((status&0x10)==0x10){		//New X data
+				address(0x29);
+				read(file, buf, 1);
+				xhigh = buf[0]<<24;
+				address(0x28);
+				read(file,buf,1);
+				xlow = buf[0]<<16;
+				xsum=xsum+xhigh+xlow;
+				ix=ix+1;
+			}
+
+		}else{ }
+	}
+	xsum=xsum>>16;
+	printf("Wait ..\n");
+	int xthreshold=(0xFFFFFFFF-xsum/ix)+1;
+	return xthreshold;
+}
+
+int ycalibrate(){
+
+	char buf[1];
+	int status = 0;
+	int iy=0; int ysum=0; int yhigh=0; int ylow=0;
+
+	while (iy<=60){
+
+		usleep(1000);
+
+		address(0x27);
+		read(file,buf,1);
+		status = buf[0];
+
+		if((status&0x80)==0x80){			//New Data
+			if ((status&0x20)==0x20){		//New Y data
+				address(0x2B);
+				read(file,buf,1);
+				yhigh = buf[0]<<24;
+				address(0x2A);
+				read(file,buf,1);
+				ylow = buf[0]<<16;
+				ysum = ysum+yhigh+ylow;
+				iy=iy+1;
+			}
+		}else{ }
+	}
+	printf("Wait ...\n");
+	int ythreshold=(0xFFFFFFFF-(ysum>>16)/iy)+1;
+	return ythreshold;
+}
+
+int zcalibrate(){
+
+	char buf[1];
+	int status = 0;
+	int iz=0; int zsum=0; int zhigh=0; int zlow=0;
+
+	while (iz<=60){
+
+		usleep(1000);
+
+		address(0x27);
+		read(file,buf,1);
+		status = buf[0];
+
+		if((status&0x80)==0x80){			//New Data
+			if ((status&0x40)==0x40){		//New Z data
+				address(0x2D);
+				read(file,buf,1);
+				zhigh = buf[0]<<24;
+				address(0x2C);
+				read(file,buf,1);
+				zlow = buf[0]<<16;
+				zsum=zsum+zhigh+zlow;
+				iz=iz+1;
+			}
+		}
+	}
+	printf("Wait ....\n");
+	int zthreshold=(0xFFFFFFFF-(zsum>>16)/iz)+1;
+	return zthreshold;
+}
+
+int main(void){
+
+	 //Open the device file
+
+	 file = open("/dev/i2c-2", O_RDWR);
+
+	 if (file < 0){
+		 /* ERROR HANDLING: you can check errno to see what went wrong*/
+		 perror("Failed to open the i2c bus");
+		 exit(1);
+	 }
+
+	 //Device address
+
+	 int addr=0x6b;
+
+	 if (ioctl(file, I2C_SLAVE, addr) < 0) {
+		 /* ERROR HANDLING; you can check errno to see what went wrong */
+		 printf("Failed to acquire bus access and/or talk to slave.\n");
+	     exit(1);
+	 }
+
+
+	 /*All set up now*/
+
+	 char buf[10];
+
+	 address(0x0F);
+	 read(file,buf,1);
+
+	 printf("L3GD20H DEVICE: 0x%X\n",buf[0]);
+
+	 if (buf[0] != 0xD7){ 		/*0x44 = TCS34721 and TCS34725  Datasheet note*/
+		 /*NOT MY DEVICE*/
+		 printf("DEVICE ERROR");
+		 exit(1);
+	 } else { printf("Connection OK\n");}
+
+	 /*Configuration Proccess*/
+
+	 buf[0] = 0x20;
+	 buf[1] = 0x0F;				/*ODR 100Hz*/
+
+	 if (write(file, buf, 2) != 2) {	/*Point ID Register*/
+		 /* ERROR HANDLING: i2c transaction failed */
+		 printf("ERROR WRITE PROCCESS");
+		 exit(1);
+	 }
+
+	 buf[0] = 0x21;
+	 buf[1] = 0x20;
+
+	 if (write(file, buf, 2) != 2) {
+		 printf("ERROR WRITE PROCCESS");
+		 exit(1);
+	 }
+
+
+	 buf[0] = 0x23;
+	 buf[1] = 0x30;			/*2000 dsp*/
+
+	 if (write(file, buf, 2) != 2) {
+		 printf("ERROR WRITE PROCCESS");
+		 exit(1);
+	 }
+
+	 buf[0] = 0x39;
+	 buf[1] = 0x00;				/*ODR 100Hz*/
+
+	 if (write(file, buf, 2) != 2) {	/*Point ID Register*/
+		 /* ERROR HANDLING: i2c transaction failed */
+		 printf("ERROR WRITE PROCCESS");
+		 exit(1);
+	 }
+
+	 /*ADQ Proccess*/
+
+	 int xthreshold=xcalibrate();
+	 int ythreshold=ycalibrate();
+	 int zthreshold=zcalibrate();
+
+	 printf("Threshold X = %f degrees\n",xthreshold* 0.070*1.5);
+	 printf("Threshold Y = %f degrees\n",ythreshold* 0.070*1.5);
+	 printf("Threshold Z = %f degrees\n",zthreshold* 0.070*1.5);
+
+	 int status=0;
+	 int notmovement=0;
+	 int i=0;
+
+	 int xhigh=0;int xlow=0;int xoutput=0; double xdisplacement=0; int xNF=0;
+	 int yhigh=0;int ylow=0;int youtput=0; double ydisplacement=0; int yNF=0;
+	 int zhigh=0;int zlow=0;int zoutput=0; double zdisplacement=0; int zNF=0;
+
+	 while (1){
+		 usleep(1000);
+		 address(0x27);
+		 read(file,buf,1);
+		 status = buf[0];
+		 if((status&0x80)==0x80){			//New Data
+			 if ((status&0x10)==0x10){		//New X data
+				 address(0x29);
+				 read(file, buf, 1);
+				 xhigh = buf[0]<<8;
+				 address(0x28);
+				 read(file,buf,1);
+				 xlow = buf[0];
+				 if (xhigh>=0x8000){
+					 xoutput=(0xFFFF-(xhigh+xlow)+1);
+					 xNF=1;
+				 } else {
+					 xoutput=xhigh+xlow;
+					 xNF=0;
+				 }
+
+			 }
+
+			 if ((status&0x20)==0x20){		//New Y data
+				 address(0x2B);
+				 read(file,buf,1);
+				 yhigh = buf[0]<<8;
+				 address(0x2A);
+				 read(file,buf,1);
+				 ylow = buf[0];
+				 if (yhigh>=0x8000){
+					 youtput=(0xFFFF-(yhigh+ylow)+1);
+					 yNF=1;
+				 } else {
+					 youtput=yhigh+ylow;
+					 yNF=0;
+				 }
+			 }
+			 if ((status&0x40)==0x40){		//New Z data
+				 address(0x2D);
+				 read(file,buf,1);
+				 zhigh = buf[0]<<8;
+				 address(0x2C);
+				 read(file,buf,1);
+				 zlow = buf[0];
+				 if (zhigh>=0x8000){
+					 zoutput=(0xFFFF-(zhigh+zlow)+1);
+					 zNF=1;
+				 } else {
+					 zoutput=zhigh+zlow;
+					 zNF=0;
+				 }
+			 }
+
+			 if (((xoutput*0.070)>=(xthreshold* 0.070*1.5))){//||((youtput*0.070)>=(ythreshold* 0.070*1.5))||((zoutput*0.070>=zthreshold* 0.070*1.5))){
+				 if (xNF==1){
+					 xdisplacement = xdisplacement - 0.01*(xoutput)*0.070;
+				 } else {xdisplacement = xdisplacement + 0.01*(xoutput)*0.070;}
+				 if (yNF==1){
+					 ydisplacement = ydisplacement - 0.01*(youtput)*0.070;
+				 } else {ydisplacement = ydisplacement + 0.01*(youtput)*0.070;}
+				 if (zNF==1){
+					 zdisplacement = zdisplacement - 0.01*(zoutput)*0.070;
+				 } else {zdisplacement = zdisplacement + 0.01*(zoutput)*0.070;}
+				 notmovement = 0;
+				 i=i+1;
+				 if (i>=10){
+					 printf("X: %f			Y: %f			Z: %f\n",xdisplacement/i,ydisplacement/i,zdisplacement/i);
+					 i=0;
+				 }
+			 } else {
+				 notmovement=notmovement+1;
+				 if (notmovement>=100){
+					 xdisplacement=0; ydisplacement=0; zdisplacement=0;
+				 }
+
+			 }
+
+		 }else{ }
+
+	 }
+
+	 return EXIT_SUCCESS;
+
+ }
+

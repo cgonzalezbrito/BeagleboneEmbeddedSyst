@@ -1,0 +1,11 @@
+11:47:40 **** Incremental Build of configuration Debug for project HelloWorld ****
+make all 
+Building file: ../src/HelloWorld.c
+/bin/sh: /home/cgonzalezbrito/Documents/UPM/MISSSI/ADA/BeagleBone/buildroot-2016.05/output/host/usr/bin/arm-buildroot-linux-uclibcgnueabihf-gcc: Permission denied
+Invoking: Cross GCC Compiler
+arm-buildroot-linux-uclibcgnueabihf-gcc -I/home/cgonzalezbrito/Documents/UPM/MISSSI/ADA/BeagleBone/buildroot-2016.05/output/host/usr/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"src/HelloWorld.d" -MT"src/HelloWorld.d" -o "src/HelloWorld.o" "../src/HelloWorld.c"
+make: *** [src/HelloWorld.o] Error 126
+src/subdir.mk:18: recipe for target 'src/HelloWorld.o' failed
+
+11:47:40 Build Finished (took 493ms)
+

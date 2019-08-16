@@ -1,0 +1,124 @@
+/*
+ ============================================================================
+ Name        : TCS34725.c
+ Author      : cgonzalezbrito
+ Version     :
+ Copyright   :
+ Description : Hello World in C, Ansi-style
+ ============================================================================
+ */
+
+# include <stdio.h>
+# include <stdlib.h>
+
+#include <linux/i2c-dev.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+ int file = 0;
+
+ void address(int address){
+ 	char buf[1];
+ 	buf[0]=0xA0|address;
+ 	if (write(file,buf,1) != 1){
+ 		/* ERROR HANDLING: i2c transaction failed */
+ 		printf("ERROR WRITE PROCCESS");
+ 		exit(1);
+ 	}
+ }
+
+int main(void){
+
+	 //Open the device file
+
+	 file = open("/dev/i2c-2", O_RDWR);
+
+	 if (file < 0){
+		 /* ERROR HANDLING: you can check errno to see what went wrong*/
+		 perror("Failed to open the i2c bus");
+		 exit(1);
+	 }
+
+	 //Device address
+
+	 int addr=0x29;
+
+	 if (ioctl(file, I2C_SLAVE, addr) < 0) {
+		 /* ERROR HANDLING; you can check errno to see what went wrong */
+		 printf("Failed to acquire bus access and/or talk to slave.\n");
+	     exit(1);
+	 }
+
+
+	 /*All set up now*/
+
+	 char buf[10];
+	 char buf1[2];
+	 int i=0;
+
+	 //Check connection
+
+	 address(0x12);
+	 read(file,buf,1);
+
+	 if (buf[0] != 0x44){ 		/*0x44 = TCS34721 and TCS34725  Datasheet note*/
+		 /*NOT MY DEVICE*/
+		 printf("DEVICE ERROR");
+		 exit(1);
+	 } else { printf("Connection OK\n");}
+
+
+	 /*Cinfiguration:*/
+
+	 //ENABLE Register
+	 buf1[0] = 0x80; // Command Register, point to 0x00 register (Enable register)
+	 buf1[1] = 0x0B; // 0b00001011 ; Wait Enable, Channels ADC (RGB), ON
+	 if (write(file, buf1, 2) != 2) { printf("ERROR WRITE PROCCESS 0"); exit(1); }
+
+	 //RGBC TIMING Register
+	 buf1[0] = 0x80 | 0x01; // Command Register, point to 0x01
+	 buf1[1] = 0x00; 		// 700ms
+	 if (write(file, buf1, 2) != 2) { printf("ERROR WRITE PROCCESS 0"); exit(1); }
+
+	 //WAIT TIME Register
+	 buf1[0] = 0x80 | 0x03; // Command Register, point to 0x03
+	 buf1[1] = 0xAB; 		// 204 ms
+	 if (write(file, buf1, 2) != 2) { printf("ERROR WRITE PROCCESS 0"); exit(1); }
+
+	 //CONFIGURATION Register
+	 buf1[0] = 0x80 | 0x0D; // Command Register, point to 0x0D
+	 buf1[1] = 0x00; 		// WLONG = 0 -- 2.4ms
+	 if (write(file, buf1, 2) != 2) { printf("ERROR WRITE PROCCESS 0"); exit(1); }
+
+	 //CONTROL Register
+	 buf1[0] = 0x80 | 0x0F; // Command Register, point to 0x0F
+	 buf1[1] = 0x00; 		// Gain = 1x
+	 if (write(file, buf1, 2) != 2) { printf("ERROR WRITE PROCCESS 0"); exit(1); }
+
+	 while (1){
+
+		 sleep(1);	//loop 1s
+		 address(0x14); // Command Register: Auto-increment protocol transaction; Point results registers
+		 read(file,buf,8);
+		 printf("%X\n",buf[0]);
+
+
+		 /*
+		 printf("0x");
+		 for (i=1;i<=8;i++){
+			 printf("%X ",buf[i]);
+			 if(i%2==0){printf("  			0x");}
+		 }
+		 printf("\n");*/
+	 }
+	 return EXIT_SUCCESS;
+
+
+ }
+

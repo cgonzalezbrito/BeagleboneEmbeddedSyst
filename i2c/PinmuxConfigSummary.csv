@@ -1,0 +1,5 @@
+Design Signal Pad Name,IO Power Group,PUPD State During HHV,PUPD State After HHV,IO Power Supply Name,IO Power Setting,Required Voltage Level,Ball Name,Selected Mode Number,Mode Interface Name,Mode Signal Name,Mode Type,User Checked PU,User Checked PD,User Checked RX,User Requirement Name
+gmii1_rxer,GEMAC-A,PD,PD,vddshv5,,,J15,3,I2C1,I2C1_SCL,,false,false,true,I2C2
+gmii1_crs,GEMAC-A,PD,PD,vddshv5,,,H17,3,I2C1,I2C1_SDA,,false,false,true,I2C2
+I2C0_SCL,GENERAL,OFF,PU,vddshv6,,,C16,0,I2C0,I2C0_SCL,,false,false,true,I2C3
+I2C0_SDA,GENERAL,OFF,PU,vddshv6,,,C17,0,I2C0,I2C0_SDA,,false,false,true,I2C3
